@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db, pool } from "./db";
 import {
   users,
   products,
@@ -25,6 +25,8 @@ import {
   type InsertFlashSale,
 } from "@shared/schema";
 import { eq, desc, and, gt, or, isNull, lte, gte } from "drizzle-orm";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 
 export interface IStorage {
   // User/Auth
@@ -87,6 +89,16 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+
+  constructor() {
+    const PgStore = connectPgSimple(session);
+    this.sessionStore = new PgStore({
+      pool,
+      createTableIfMissing: true,
+    });
+  }
+
   // User/Auth
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
