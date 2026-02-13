@@ -7,8 +7,6 @@ import { z } from "zod";
 import crypto from "crypto";
 import type { OrderItem, Order } from "@shared/schema";
 import { insertCouponSchema, insertReviewSchema, insertBulkDiscountSchema, insertFlashSaleSchema } from "@shared/schema";
-import { registerChatRoutes } from "./replit_integrations/chat";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import Razorpay from "razorpay";
 import { sendInvoiceEmail } from "./email";
 
@@ -315,12 +313,6 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   setupAuth(app);
-  
-  // Register AI chat routes
-  registerChatRoutes(app);
-  
-  // Register object storage routes for image uploads
-  registerObjectStorageRoutes(app);
 
   // === Products ===
   app.get(api.products.list.path, async (req, res) => {

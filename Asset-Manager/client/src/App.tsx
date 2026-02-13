@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/hooks/use-auth";
 import { CartProvider } from "@/contexts/cart-context";
 import { WishlistProvider } from "@/contexts/wishlist-context";
-import { Chatbot } from "@/components/chatbot";
 import { BackToTop } from "@/components/back-to-top";
 import { Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
@@ -63,7 +62,6 @@ function App() {
         <CartProvider>
           <WishlistProvider>
             <Router />
-            <Chatbot />
             <BackToTop />
             <Toaster />
           </WishlistProvider>
