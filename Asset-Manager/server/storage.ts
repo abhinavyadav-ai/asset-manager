@@ -26,7 +26,7 @@ import {
 } from "@shared/schema";
 import { eq, desc, and, gt, or, isNull, lte, gte } from "drizzle-orm";
 import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
+import { PgSessionStore } from "./pg-session-store";
 
 export interface IStorage {
   // User/Auth
@@ -92,11 +92,7 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    const PgStore = connectPgSimple(session);
-    this.sessionStore = new PgStore({
-      pool,
-      createTableIfMissing: false,
-    });
+    this.sessionStore = new PgSessionStore({ pool });
   }
 
   // User/Auth
