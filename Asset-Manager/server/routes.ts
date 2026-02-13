@@ -10,7 +10,7 @@ import { insertCouponSchema, insertReviewSchema, insertBulkDiscountSchema, inser
 import Razorpay from "razorpay";
 import { sendInvoiceEmail } from "./email";
 import multer from "multer";
-import { cloudinary, ensureConfig as ensureCloudinaryConfig } from "./cloudinary";
+import { cloudinary } from "./cloudinary";
 
 // Configure multer for memory storage (files stay in buffer, not disk)
 const upload = multer({
@@ -336,18 +336,28 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No file" });
       }
 
-      // Check Cloudinary config
-      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-        console.error("Cloudinary env vars missing:", {
-          CLOUD_NAME: !!process.env.CLOUDINARY_CLOUD_NAME,
-          API_KEY: !!process.env.CLOUDINARY_API_KEY,
-          API_SECRET: !!process.env.CLOUDINARY_API_SECRET,
-        });
-        return res.status(500).json({ error: "Cloudinary not configured" });
+      const cn = process.env.CLOUDINARY_CLOUD_NAME;
+      const ak = process.env.CLOUDINARY_API_KEY;
+      const as = process.env.CLOUDINARY_API_SECRET;
+
+      console.log("Cloudinary debug:", {
+        cloud_name: cn || "MISSING",
+        api_key: ak ? ak.substring(0, 4) + "***" : "MISSING",
+        api_secret: as ? as.substring(0, 4) + "***" : "MISSING",
+      });
+
+      if (!cn || !ak || !as) {
+        return res.status(500).json({ error: "Cloudinary not configured - check env vars" });
       }
 
+      // Configure fresh every time to ensure env vars are read
+      cloudinary.config({
+        cloud_name: cn,
+        api_key: ak,
+        api_secret: as,
+      });
+
       const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-      ensureCloudinaryConfig();
       const result = await cloudinary.uploader.upload(b64, { folder: "products" });
 
       res.json({ url: result.secure_url });
