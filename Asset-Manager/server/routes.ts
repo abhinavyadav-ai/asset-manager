@@ -10,7 +10,7 @@ import { insertCouponSchema, insertReviewSchema, insertBulkDiscountSchema, inser
 import Razorpay from "razorpay";
 import { sendInvoiceEmail } from "./email";
 import multer from "multer";
-import { uploadToCloudinary } from "./cloudinary";
+import { cloudinary } from "./cloudinary";
 
 // Configure multer for memory storage (files stay in buffer, not disk)
 const upload = multer({
@@ -330,34 +330,21 @@ export async function registerRoutes(
   setupAuth(app);
 
   // === Image Upload (Cloudinary) ===
-  app.post('/api/uploads/file', upload.single('file'), async (req, res) => {
+  app.post("/api/uploads/file", upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: "No file provided" });
+        return res.status(400).json({ error: "No file" });
       }
 
-      // Check if Cloudinary is configured
-      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-        return res.status(500).json({ error: "Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables." });
-      }
+      const result = await cloudinary.uploader.upload(
+        `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+        { folder: "products" }
+      );
 
-      const result = await uploadToCloudinary(req.file.buffer, {
-        folder: "luxe-candle",
-      });
-
-      return res.status(200).json({
-        url: result.url,
-        publicId: result.publicId,
-        objectPath: result.url,
-        metadata: {
-          name: req.file.originalname,
-          size: req.file.size,
-          contentType: req.file.mimetype,
-        },
-      });
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      return res.status(500).json({ error: error.message || "Upload failed" });
+      res.json({ url: result.secure_url });
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: "Upload failed" });
     }
   });
 

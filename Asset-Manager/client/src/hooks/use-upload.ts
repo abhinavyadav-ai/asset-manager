@@ -82,17 +82,16 @@ export function useUpload(options: UseUploadOptions = {}) {
           body: formData,
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to upload file");
-        }
-
         const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to upload file");
+        }
         
         const uploadResponse: UploadResponse = {
-          uploadURL: "", // Not used in direct upload
-          objectPath: data.objectPath,
-          metadata: data.metadata,
+          uploadURL: "",
+          objectPath: data.url, // Cloudinary URL
+          metadata: data.metadata || { name: file.name, size: file.size, contentType: file.type },
         };
 
         setProgress(100);
