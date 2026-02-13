@@ -95,7 +95,7 @@ export class DatabaseStorage implements IStorage {
     const PgStore = connectPgSimple(session);
     this.sessionStore = new PgStore({
       pool,
-      createTableIfMissing: true,
+      createTableIfMissing: false,
     });
   }
 
