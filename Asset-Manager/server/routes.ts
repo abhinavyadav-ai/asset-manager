@@ -336,15 +336,23 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No file" });
       }
 
-      const result = await cloudinary.uploader.upload(
-        `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
-        { folder: "products" }
-      );
+      // Check Cloudinary config
+      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        console.error("Cloudinary env vars missing:", {
+          CLOUD_NAME: !!process.env.CLOUDINARY_CLOUD_NAME,
+          API_KEY: !!process.env.CLOUDINARY_API_KEY,
+          API_SECRET: !!process.env.CLOUDINARY_API_SECRET,
+        });
+        return res.status(500).json({ error: "Cloudinary not configured" });
+      }
+
+      const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      const result = await cloudinary.uploader.upload(b64, { folder: "products" });
 
       res.json({ url: result.secure_url });
     } catch (err: any) {
-      console.error("Upload error:", err);
-      res.status(500).json({ error: "Upload failed" });
+      console.error("Upload error:", err?.message || err);
+      res.status(500).json({ error: err?.message || "Upload failed" });
     }
   });
 
