@@ -462,10 +462,8 @@ function ProductEditView({ productId, onBack }: { productId: number | null; onBa
   
   const { uploadFile, isUploading } = useUpload({
     onSuccess: (response) => {
-      // objectPath already includes /objects/ prefix
-      const imageUrl = response.objectPath.startsWith('/objects/') 
-        ? response.objectPath 
-        : `/objects/${response.objectPath}`;
+      // Cloudinary returns the full URL directly
+      const imageUrl = response.objectPath;
       setImages(prev => [...prev, imageUrl]);
       toast({ title: "Image uploaded successfully!" });
     },

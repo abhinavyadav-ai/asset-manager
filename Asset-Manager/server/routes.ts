@@ -9,6 +9,21 @@ import type { OrderItem, Order } from "@shared/schema";
 import { insertCouponSchema, insertReviewSchema, insertBulkDiscountSchema, insertFlashSaleSchema } from "@shared/schema";
 import Razorpay from "razorpay";
 import { sendInvoiceEmail } from "./email";
+import multer from "multer";
+import { uploadToCloudinary } from "./cloudinary";
+
+// Configure multer for memory storage (files stay in buffer, not disk)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+});
 
 // Initialize Razorpay if credentials are available
 let razorpayInstance: Razorpay | null = null;
@@ -313,6 +328,38 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   setupAuth(app);
+
+  // === Image Upload (Cloudinary) ===
+  app.post('/api/uploads/file', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      // Check if Cloudinary is configured
+      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        return res.status(500).json({ error: "Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables." });
+      }
+
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: "luxe-candle",
+      });
+
+      return res.status(200).json({
+        url: result.url,
+        publicId: result.publicId,
+        objectPath: result.url,
+        metadata: {
+          name: req.file.originalname,
+          size: req.file.size,
+          contentType: req.file.mimetype,
+        },
+      });
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      return res.status(500).json({ error: error.message || "Upload failed" });
+    }
+  });
 
   // === Products ===
   app.get(api.products.list.path, async (req, res) => {
