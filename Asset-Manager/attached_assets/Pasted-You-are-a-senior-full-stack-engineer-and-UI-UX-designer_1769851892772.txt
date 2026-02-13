@@ -1,0 +1,134 @@
+You are a senior full-stack engineer and UI/UX designer.
+
+Build a COMPLETE, PRODUCTION-READY, PREMIUM candle e-commerce website.
+
+GOAL:
+A fast, luxury-looking candle store with products, cart, payments, address system,
+order management, and admin panel. Every button must work perfectly.
+
+TECH STACK:
+- Frontend: Next.js (App Router)
+- Styling: Tailwind CSS (ultra-premium, minimal UI)
+- Backend: Next.js API routes (Node.js)
+- Database: Firebase or MongoDB
+- Image Storage: Cloudinary
+- Payments: Razorpay (India) + Cash on Delivery
+- Hosting-ready, optimized, clean code
+
+--------------------------------
+DESIGN & UI (VERY IMPORTANT)
+--------------------------------
+- Luxury, minimal, high-end brand feel
+- Colors:
+  - Background: Ivory White (#FAF9F6)
+  - Text: Charcoal Black (#111111)
+  - Accent ONLY: Warm Gold (#C9A24D)
+- Gold used only for CTA buttons, highlights, price
+- No clutter, lots of white space
+- App-like smooth scrolling
+- Mobile-first responsive design
+
+Typography:
+- Headings: Elegant serif (Playfair Display style)
+- Body: Clean sans-serif (Inter / Poppins)
+
+--------------------------------
+FEATURES
+--------------------------------
+
+1. PRODUCTS SYSTEM
+- Admin can add/edit/delete products
+- Fields:
+  - Product name
+  - Description
+  - Cost price
+  - Margin %
+  - Auto-calculated selling price
+  - Stock quantity
+  - Category
+  - Multiple images upload
+- Enable / Disable product
+- Products displayed in premium grid layout
+
+2. PRODUCT DETAILS PAGE
+- Image gallery
+- Price
+- Stock status
+- Quantity selector
+- Add to Cart button
+- Buy Now button
+
+3. CART SYSTEM
+- Add / remove items
+- Quantity update
+- Price calculation
+- Subtotal, shipping, total
+- Persist cart using localStorage
+- Clean premium cart UI
+
+4. ADDRESS SYSTEM
+- Customer address form:
+  - Full name
+  - Phone number
+  - House / Street
+  - City
+  - State
+  - Pincode
+- Save address with order
+- Show address summary before payment
+
+5. PAYMENTS
+- Razorpay integration
+- Cash on Delivery option
+- Payment success / failure handling
+- Secure order confirmation
+
+6. ORDER MANAGEMENT (ADMIN PANEL)
+- Admin dashboard:
+  - Total orders
+  - Pending / Shipped / Delivered
+- Each order shows:
+  - Order ID
+  - Customer details
+  - Address
+  - Products list
+  - Quantity
+  - Total amount
+  - Payment mode
+  - Order status
+- Update order status (Pending → Shipped → Delivered)
+
+7. CUSTOMER ORDER CONFIRMATION
+- Order success page
+- Order summary
+- Order ID displayed clearly
+
+8. PERFORMANCE
+- Image optimization
+- Lazy loading
+- Fast API responses
+- No unnecessary libraries
+- Lighthouse score focused
+
+--------------------------------
+ADMIN PANEL
+--------------------------------
+- Secure admin login
+- Product management
+- Order management
+- Stock control
+- Simple clean UI (not fancy, but professional)
+
+--------------------------------
+DELIVERABLE
+--------------------------------
+- Fully working code
+- Clean folder structure
+- Environment variable usage
+- Razorpay setup instructions
+- Ready to deploy
+- No placeholders
+- No broken links
+- No non-working buttons
+
+Build it as a real business website, not a demo.

@@ -1,0 +1,86 @@
+You are a senior full-stack web developer.
+
+Build a COMPLETE, FAST, PROFESSIONAL candle business website.
+
+TECH STACK:
+- Frontend: Next.js (App Router)
+- Styling: Tailwind CSS (luxury, minimal UI)
+- Backend: API routes (Node.js)
+- Database: Firebase (products + orders)
+- Image Upload: Cloudinary
+- Hosting-ready, production-grade code
+
+WEBSITE REQUIREMENTS:
+
+1. HOME PAGE
+- Premium hero section (luxury candle brand look)
+- Clean white / beige / black theme
+- CTA button: "Order on WhatsApp"
+- Smooth animations
+- Mobile-first responsive design
+
+2. PRODUCT MANAGEMENT (ADMIN PANEL)
+- Admin login (simple password-based)
+- Add candle product:
+  - Candle name
+  - Cost price
+  - Margin percentage
+  - Auto-calculate selling price
+  - Description
+  - Upload multiple images
+- Enable / Disable product
+- All data saved in Firebase
+
+3. PRODUCT LISTING PAGE
+- Grid layout
+- Fast image loading
+- Price shown clearly
+- Click product → open details page
+
+4. PRODUCT DETAILS PAGE
+- Image gallery
+- Candle details (size, fragrance, burn time)
+- Price
+- Quantity selector
+- ORDER ON WHATSAPP button
+
+5. WHATSAPP ORDER SYSTEM (VERY IMPORTANT)
+- On button click, auto-generate WhatsApp message:
+  - Product name
+  - Price
+  - Quantity
+  - Customer name
+  - Phone number
+  - Delivery address
+  - Google Maps live location link
+- Redirect directly to owner WhatsApp number
+
+6. ORDER STORAGE
+- Save every order in Firebase
+- Admin panel shows:
+  - Order list
+  - Customer details
+  - Location link
+  - Date & time
+
+7. PERFORMANCE
+- Extremely fast loading
+- Optimized images
+- No unnecessary libraries
+- Clean, well-structured code
+
+8. UI/UX
+- Premium luxury brand feel
+- Smooth scrolling
+- Clear typography
+- Big clickable buttons
+- App-like experience
+
+DELIVERABLE:
+- Full working code
+- Folder structure
+- Setup instructions
+- Environment variable usage
+- Ready to deploy
+
+Make everything functional. No placeholders. No broken buttons.
