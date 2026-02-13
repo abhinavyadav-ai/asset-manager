@@ -10,7 +10,7 @@ import { insertCouponSchema, insertReviewSchema, insertBulkDiscountSchema, inser
 import Razorpay from "razorpay";
 import { sendInvoiceEmail } from "./email";
 import multer from "multer";
-import { cloudinary, configureCloudinary } from "./cloudinary";
+import { uploadToCloudinary } from "./cloudinary";
 
 // Configure multer for memory storage (files stay in buffer, not disk)
 const upload = multer({
@@ -330,8 +330,6 @@ export async function registerRoutes(
   setupAuth(app);
 
   // === Image Upload (Cloudinary) ===
-  configureCloudinary();
-
   app.post("/api/uploads/file", upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
@@ -339,9 +337,9 @@ export async function registerRoutes(
       }
 
       const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-      const result = await cloudinary.uploader.upload(b64, { folder: "products" });
+      const url = await uploadToCloudinary(b64);
 
-      res.json({ url: result.secure_url });
+      res.json({ url });
     } catch (err: any) {
       console.error("Upload error:", err?.message || err);
       res.status(500).json({ error: err?.message || "Upload failed" });
