@@ -6,6 +6,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { CartProvider } from "@/contexts/cart-context";
 import { WishlistProvider } from "@/contexts/wishlist-context";
 import { BackToTop } from "@/components/back-to-top";
+import { Chatbot } from "@/components/chatbot";
 import { DelhiDeliveryPopup } from "@/components/delhi-delivery-popup";
 import { Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
@@ -64,6 +65,7 @@ function App() {
           <WishlistProvider>
             <Router />
             <BackToTop />
+            <Chatbot />
             <DelhiDeliveryPopup />
             <Toaster />
           </WishlistProvider>
