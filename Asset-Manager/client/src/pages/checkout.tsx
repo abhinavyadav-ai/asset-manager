@@ -16,7 +16,7 @@ declare global {
   }
 }
 
-type PaymentMethod = "razorpay" | "upi";
+type PaymentMethod = "razorpay" | "upi" | "cod";
 
 export default function Checkout() {
   const { items, subtotal, clearCart, getShippingForCity } = useCart();
@@ -257,6 +257,16 @@ export default function Checkout() {
       paymentStatus: "pending",
       status: "pending",
     };
+
+    // Handle Cash on Delivery
+    if (paymentMethod === "cod") {
+      createOrder.mutate({
+        ...orderData,
+        paymentMethod: "cod",
+        paymentStatus: "pending",
+      });
+      return;
+    }
 
     // Handle UPI Direct payment
     if (paymentMethod === "upi") {
@@ -619,6 +629,29 @@ export default function Checkout() {
                         <div>
                           <p className="font-semibold text-foreground">Pay Online</p>
                           <p className="text-sm text-muted-foreground">Cards, NetBanking</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("cod")}
+                      className={`p-6 rounded-xl border-2 transition-all text-left ${
+                        paymentMethod === "cod"
+                          ? "border-primary bg-primary/10"
+                          : "border-white/10 hover:border-white/20"
+                      }`}
+                      data-testid="button-payment-cod"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          paymentMethod === "cod" ? "bg-primary/20" : "bg-secondary"
+                        }`}>
+                          <Banknote className={`w-6 h-6 ${paymentMethod === "cod" ? "gold-text" : "text-muted-foreground"}`} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">Cash on Delivery</p>
+                          <p className="text-sm text-muted-foreground">Pay when delivered</p>
                         </div>
                       </div>
                     </button>

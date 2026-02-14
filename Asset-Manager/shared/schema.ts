@@ -119,7 +119,7 @@ export const ORDER_STATUSES = ["pending", "confirmed", "shipped", "delivered", "
 export type OrderStatus = typeof ORDER_STATUSES[number];
 
 // Payment methods
-export const PAYMENT_METHODS = ["razorpay", "upi"] as const;
+export const PAYMENT_METHODS = ["razorpay", "upi", "cod"] as const;
 export type PaymentMethod = typeof PAYMENT_METHODS[number];
 
 // Site Settings

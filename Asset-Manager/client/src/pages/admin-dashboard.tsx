@@ -622,6 +622,37 @@ function ProductEditView({ productId, onBack }: { productId: number | null; onBa
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-muted-foreground block mb-2">Margin %</label>
+                <input 
+                  type="number"
+                  {...form.register("marginPercent", { valueAsNumber: true })}
+                  className="w-full px-4 py-3 bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-primary/50"
+                  placeholder="0"
+                  onChange={(e) => {
+                    const margin = parseFloat(e.target.value) || 0;
+                    const cost = form.getValues("costPrice") || 0;
+                    if (cost > 0 && margin > 0) {
+                      form.setValue("price", Math.round(cost * (1 + margin / 100)));
+                    }
+                    form.register("marginPercent").onChange(e);
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-2">Auto Price</label>
+                <div className="w-full px-4 py-3 bg-[#050505]/50 border border-white/5 rounded-xl text-muted-foreground text-sm">
+                  {(() => {
+                    const cost = form.watch("costPrice") || 0;
+                    const margin = form.watch("marginPercent") || 0;
+                    if (cost > 0 && margin > 0) return `₹${Math.round(cost * (1 + margin / 100))}`;
+                    return "Set cost + margin";
+                  })()}
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="text-sm text-muted-foreground block mb-2">Stock Quantity</label>
               <input 
@@ -745,6 +776,17 @@ function OrdersView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       toast({ title: "Status updated" });
+    }
+  });
+
+  const updateTrackingMutation = useMutation({
+    mutationFn: async ({ orderId, trackingNumber, deliveryPartner }: { orderId: number; trackingNumber: string; deliveryPartner: string }) => {
+      const res = await apiRequest("PATCH", `/api/orders/${orderId}/tracking`, { trackingNumber, deliveryPartner });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Tracking info updated" });
     }
   });
 
@@ -910,6 +952,54 @@ function OrdersView() {
                     ))}
                   </div>
                 </div>
+                <div className="mt-4 pt-3 border-t border-white/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Truck className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Tracking & Delivery</span>
+                  </div>
+                  <div className="grid md:grid-cols-3 gap-3">
+                    <input
+                      defaultValue={(order as any).trackingNumber || ""}
+                      placeholder="Tracking number"
+                      className="px-3 py-2 bg-[#050505] border border-white/10 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        if (val !== ((order as any).trackingNumber || "")) {
+                          updateTrackingMutation.mutate({
+                            orderId: order.id,
+                            trackingNumber: val,
+                            deliveryPartner: (order as any).deliveryPartner || ""
+                          });
+                        }
+                      }}
+                    />
+                    <select
+                      defaultValue={(order as any).deliveryPartner || ""}
+                      className="px-3 py-2 bg-[#050505] border border-white/10 rounded-lg text-sm focus:outline-none focus:border-primary/50"
+                      onChange={(e) => {
+                        updateTrackingMutation.mutate({
+                          orderId: order.id,
+                          trackingNumber: (order as any).trackingNumber || "",
+                          deliveryPartner: e.target.value
+                        });
+                      }}
+                    >
+                      <option value="">Select partner</option>
+                      <option value="Delhivery">Delhivery</option>
+                      <option value="BlueDart">BlueDart</option>
+                      <option value="DTDC">DTDC</option>
+                      <option value="India Post">India Post</option>
+                      <option value="Ekart">Ekart</option>
+                      <option value="Shadowfax">Shadowfax</option>
+                      <option value="Self">Self Delivery</option>
+                    </select>
+                    {(order as any).trackingNumber && (
+                      <span className="text-xs text-green-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Tracking set
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -1022,7 +1112,44 @@ function CouponsView() {
               />
             </div>
           </div>
-          <div className="flex justify-end gap-3">
+          <div className="grid md:grid-cols-4 gap-4 mt-4">
+            <div>
+              <label className="text-sm text-muted-foreground block mb-2">Min Order (₹)</label>
+              <input 
+                type="number"
+                {...form.register("minOrderValue", { valueAsNumber: true })}
+                placeholder="0"
+                className="w-full px-4 py-3 bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-2">Max Discount (₹)</label>
+              <input 
+                type="number"
+                {...form.register("maxDiscount", { valueAsNumber: true })}
+                placeholder="No limit"
+                className="w-full px-4 py-3 bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-2">Usage Limit</label>
+              <input 
+                type="number"
+                {...form.register("usageLimit", { valueAsNumber: true })}
+                placeholder="Unlimited"
+                className="w-full px-4 py-3 bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-2">Expires At</label>
+              <input 
+                type="datetime-local"
+                {...form.register("expiresAt")}
+                className="w-full px-4 py-3 bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-primary/50"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-4">
             <button 
               type="button"
               onClick={() => setShowForm(false)}
@@ -1776,6 +1903,7 @@ function FlashSalesView() {
   const [discountPercent, setDiscountPercent] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [bannerImage, setBannerImage] = useState('');
 
   const { data: flashSales, isLoading } = useQuery<FlashSale[]>({
     queryKey: ['/api/flash-sales'],
@@ -1831,6 +1959,7 @@ function FlashSalesView() {
       discountPercent: discountPercent ? parseFloat(discountPercent) : undefined,
       startDate: new Date(startDate).toISOString(),
       endDate: new Date(endDate).toISOString(),
+      bannerImage: bannerImage || undefined,
       isActive: true,
     });
   };
@@ -1923,6 +2052,17 @@ function FlashSalesView() {
                   data-testid="input-flash-sale-end"
                 />
               </div>
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-sm text-gray-400 mb-1 block">Banner Image URL (optional)</label>
+              <input
+                type="text"
+                value={bannerImage}
+                onChange={(e) => setBannerImage(e.target.value)}
+                placeholder="https://res.cloudinary.com/... or paste image URL"
+                className="w-full px-4 py-2 bg-[#050505] border border-white/10 rounded-lg focus:border-[#F5A623] focus:outline-none"
+                data-testid="input-flash-sale-banner"
+              />
             </div>
           </div>
           <div className="flex gap-3">
