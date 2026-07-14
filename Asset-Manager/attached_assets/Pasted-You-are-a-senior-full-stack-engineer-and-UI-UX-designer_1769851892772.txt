@@ -1,6 +1,4 @@
-You are a senior full-stack engineer and UI/UX designer.
 
-Build a COMPLETE, PRODUCTION-READY, PREMIUM candle e-commerce website.
 
 GOAL:
 A fast, luxury-looking candle store with products, cart, payments, address system,
