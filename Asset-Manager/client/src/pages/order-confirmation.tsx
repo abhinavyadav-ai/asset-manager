@@ -4,6 +4,8 @@ import { useParams, Link } from "wouter";
 import { motion } from "framer-motion";
 import { CheckCircle2, Package, MapPin, CreditCard, Loader2, Home, ShoppingBag, MessageCircle } from "lucide-react";
 import type { Order, OrderItem } from "@shared/schema";
+import { OptimizedImage } from "@/components/optimized-image";
+import { IMAGE_WIDTHS } from "@/lib/cloudinary";
 
 export default function OrderConfirmation() {
   const { orderNumber } = useParams<{ orderNumber: string }>();
@@ -123,7 +125,15 @@ export default function OrderConfirmation() {
                   <div key={index} className="flex gap-4">
                     {item.image && (
                       <div className="w-16 h-16 rounded-lg overflow-hidden bg-secondary shrink-0">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        <OptimizedImage
+                          src={item.image}
+                          alt={item.name}
+                          optimizedWidth={IMAGE_WIDTHS.ORDER_ITEM}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                          showSkeleton
+                        />
                       </div>
                     )}
                     <div className="flex-1">

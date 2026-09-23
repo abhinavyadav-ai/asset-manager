@@ -49,9 +49,6 @@ FEATURES
 - Products displayed in premium grid layout
 
 2. PRODUCT DETAILS PAGE
-- Image gallery
-- Price
-- Stock status
 - Quantity selector
 - Add to Cart button
 - Buy Now button

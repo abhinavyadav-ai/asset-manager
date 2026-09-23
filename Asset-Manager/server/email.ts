@@ -53,9 +53,20 @@ export async function sendInvoiceEmail(order: Order, invoiceUrl: string): Promis
     const { client, fromEmail } = getResendClient();
     
     if (!order.email) {
+      console.warn(`[Email] Order ${order.orderNumber}: No customer email provided, skipping email send.`);
       return { success: false, error: 'Customer email not available' };
     }
 
+    const customerEmail = order.email.trim();
+    const adminCcEmail = process.env.ADMIN_NOTIFICATION_EMAIL || null;
+
+    console.log(`[Email] Order ${order.orderNumber}: Sending invoice to customer: ${customerEmail}${adminCcEmail ? ` (CC: ${adminCcEmail})` : ''}`);
+    
+    // CRITICAL: Resend's test sender 'onboarding@resend.dev' can ONLY deliver to the account owner's email.
+    // To send to ANY customer email, you MUST verify your own domain in Resend and set RESEND_FROM_EMAIL.
+    if (fromEmail === 'onboarding@resend.dev') {
+      console.warn(`[Email] WARNING: Using Resend test sender (onboarding@resend.dev). Emails can ONLY be delivered to your Resend account owner email. Set RESEND_FROM_EMAIL to a verified domain sender to deliver to customers.`);
+    }
     const items = order.items as OrderItem[];
     const itemsHtml = items.map(item => `
       <tr>
@@ -149,16 +160,24 @@ export async function sendInvoiceEmail(order: Order, invoiceUrl: string): Promis
 </html>
     `;
 
-    await client.emails.send({
+    // IMPORTANT: Resend SDK returns { data, error } — it does NOT throw on API errors
+    const { data, error: resendError } = await client.emails.send({
       from: fromEmail,
-      to: order.email,
+      to: customerEmail,
+      ...(adminCcEmail ? { cc: adminCcEmail } : {}),
       subject: `Your Luxe Candle Order Invoice - ${order.orderNumber}`,
       html: emailHtml
     });
 
+    if (resendError) {
+      console.error(`[Email] Order ${order.orderNumber}: Resend API error for ${customerEmail}:`, JSON.stringify(resendError));
+      return { success: false, error: resendError.message || 'Resend API returned an error' };
+    }
+
+    console.log(`[Email] Order ${order.orderNumber}: Invoice email sent successfully to ${customerEmail} (id: ${data?.id})`);
     return { success: true };
   } catch (error: any) {
-    console.error('Failed to send invoice email:', error);
+    console.error(`[Email] Order ${order.orderNumber}: Failed to send invoice email to ${order.email}:`, error);
     return { success: false, error: error.message || 'Failed to send email' };
   }
 }

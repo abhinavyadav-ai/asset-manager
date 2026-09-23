@@ -88,14 +88,39 @@ export function setupAuth(app: Express) {
 
   // Seed Admin User
   (async () => {
-    const admin = await storage.getUserByUsername("admin");
-    if (!admin) {
-      const hashedPassword = await hashPassword("abhinavyadav751910");
-      await storage.createUser({
-        username: "admin",
+    const configuredUsername = process.env.ADMIN_EMAIL || "admin";
+    const configuredPassword = process.env.ADMIN_PASSWORD || "Admin@2026!";
+
+    const adminByConfiguredUsername = await storage.getUserByUsername(configuredUsername);
+    if (adminByConfiguredUsername) {
+      const isPasswordCurrent = await comparePasswords(configuredPassword, adminByConfiguredUsername.password);
+      if (!isPasswordCurrent) {
+        const hashedPassword = await hashPassword(configuredPassword);
+        await storage.updateUser(adminByConfiguredUsername.id, {
+          username: configuredUsername,
+          password: hashedPassword,
+        });
+        console.log("Admin password updated to configured value");
+      }
+      return;
+    }
+
+    const legacyAdmin = await storage.getUserByUsername("admin");
+    if (legacyAdmin) {
+      const hashedPassword = await hashPassword(configuredPassword);
+      await storage.updateUser(legacyAdmin.id, {
+        username: configuredUsername,
         password: hashedPassword,
       });
-      console.log("Admin user created with configured password");
+      console.log("Legacy admin user migrated to configured credentials");
+      return;
     }
+
+    const hashedPassword = await hashPassword(configuredPassword);
+    await storage.createUser({
+      username: configuredUsername,
+      password: hashedPassword,
+    });
+    console.log("Admin user created with configured credentials");
   })();
 }

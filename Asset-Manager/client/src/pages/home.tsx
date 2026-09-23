@@ -4,6 +4,8 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import type { FlashSale } from "@shared/schema";
+import { OptimizedImage } from "@/components/optimized-image";
+import { IMAGE_WIDTHS } from "@/lib/cloudinary";
 
 export default function Home() {
   // Fetch active flash sale
@@ -66,8 +68,11 @@ export default function Home() {
           <img 
             src="https://images.unsplash.com/photo-1570823336316-09a8f4c34898?q=80&w=2670&auto=format&fit=crop" 
             alt="Luxury Candle" 
-            className="w-full h-full object-cover"
-          />
+            className="w-full h-full object-cover"            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            width={1920}
+            height={1080}          />
           <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/70 to-background" />
           <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
         </div>
@@ -259,10 +264,14 @@ export default function Home() {
                   className="group block relative overflow-hidden rounded-2xl aspect-[4/5] neo-card"
                   data-testid={`card-nav-${card.title.toLowerCase()}`}
                 >
-                  <img 
+                  <OptimizedImage 
                     src={card.image}
                     alt={card.title}
+                    optimizedWidth={IMAGE_WIDTHS.NAV_CARD}
+                    width={600}
+                    height={750}
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    showSkeleton
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-8">

@@ -69,7 +69,7 @@ export default function LoginPage() {
                   {...form.register("username")}
                   type="text"
                   className="w-full pl-11 pr-4 py-3 bg-secondary/50 border border-white/10 rounded-lg focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-foreground placeholder:text-muted-foreground"
-                  placeholder="admin"
+                  placeholder="adminpanel"
                   data-testid="input-username"
                 />
               </div>

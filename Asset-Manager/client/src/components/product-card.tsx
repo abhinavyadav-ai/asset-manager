@@ -1,8 +1,11 @@
+import { memo } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Eye, Sparkles } from "lucide-react";
 import { type Product } from "@shared/schema";
 import { motion } from "framer-motion";
 import { WishlistButton } from "./wishlist-button";
+import { OptimizedImage } from "./optimized-image";
+import { IMAGE_WIDTHS } from "@/lib/cloudinary";
 
 interface ProductCardProps {
   product: Product;
@@ -10,7 +13,8 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, compact = false }: ProductCardProps) {
-  const displayImage = product.images?.[0] || "https://images.unsplash.com/photo-1602825266977-148c3b4d241d?w=800&q=80";
+  const productImages = (product.images ?? []).filter(Boolean);
+  const displayImage = productImages[0] || "https://images.unsplash.com/photo-1602825266977-148c3b4d241d?w=800&q=80";
 
   if (compact) {
     return (
@@ -21,11 +25,14 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
         data-testid={`card-product-${product.id}`}
       >
         <Link href={`/products/${product.id}`} className="block relative overflow-hidden aspect-square bg-secondary">
-          <img 
+          <OptimizedImage 
             src={displayImage} 
             alt={product.name}
+            optimizedWidth={IMAGE_WIDTHS.CARD_COMPACT}
+            width={400}
+            height={400}
             className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
+            showSkeleton
           />
           <div className="absolute top-3 right-3 glass-card px-3 py-1 rounded-full">
             <span className="gold-gradient-text text-sm font-bold">₹{product.price.toFixed(0)}</span>
@@ -63,11 +70,14 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
     >
       <Link href={`/products/${product.id}`} className="block relative overflow-hidden aspect-[4/5] bg-secondary">
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-0 group-hover:opacity-100 z-10 transition-all duration-500" />
-        <img 
+        <OptimizedImage 
           src={displayImage} 
           alt={product.name}
+          optimizedWidth={IMAGE_WIDTHS.CARD_FULL}
+          width={600}
+          height={750}
           className="w-full h-full object-cover object-center image-hover-zoom"
-          loading="lazy"
+          showSkeleton
         />
         <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out z-20">
           <div className="glass-card p-5 rounded-xl text-center flex items-center justify-center gap-3">
@@ -105,3 +115,12 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
     </motion.div>
   );
 }
+
+// Memoize to prevent re-renders when parent re-renders but product data hasn't changed
+export const MemoizedProductCard = memo(ProductCard, (prev, next) => {
+  return prev.product.id === next.product.id
+    && prev.product.price === next.product.price
+    && prev.product.stock === next.product.stock
+    && prev.product.isActive === next.product.isActive
+    && prev.compact === next.compact;
+});

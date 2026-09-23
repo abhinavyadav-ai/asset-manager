@@ -11,6 +11,8 @@ import { SocialShare } from "@/components/social-share";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Review, Product } from "@shared/schema";
+import { OptimizedImage } from "@/components/optimized-image";
+import { IMAGE_WIDTHS, getOptimizedUrl } from "@/lib/cloudinary";
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/products/:id");
@@ -146,7 +148,8 @@ export default function ProductDetailPage() {
     );
   }
 
-  const images = product.images.length > 0 ? product.images : ["https://images.unsplash.com/photo-1602825266977-148c3b4d241d?w=800&q=80"];
+  const images = (product.images ?? []).filter(Boolean);
+  const galleryImages = images.length > 0 ? images : ["https://images.unsplash.com/photo-1602825266977-148c3b4d241d?w=800&q=80"];
   const inStock = (product.stock ?? 0) > 0;
 
   return (
@@ -171,14 +174,15 @@ export default function ProductDetailPage() {
             className="space-y-4"
           >
             <div className="aspect-square neo-card rounded-2xl overflow-hidden relative glow-ring">
-              <motion.img 
+              <OptimizedImage 
                 key={activeImageIndex}
-                initial={{ opacity: 0, scale: 1.05 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                src={images[activeImageIndex]} 
+                src={galleryImages[activeImageIndex] ?? galleryImages[0]} 
                 alt={product.name} 
+                optimizedWidth={IMAGE_WIDTHS.DETAIL_MAIN}
+                width={800}
+                height={800}
                 className="w-full h-full object-cover"
+                showSkeleton
               />
               {/* Floating Price Badge */}
               <div className="absolute top-6 right-6 glass-card px-5 py-3 rounded-full">
@@ -193,11 +197,11 @@ export default function ProductDetailPage() {
               </div>
             </div>
             
-            {images.length > 1 && (
+            {galleryImages.length > 1 && (
               <div className="flex gap-3 overflow-x-auto pb-2">
-                {images.map((img, idx) => (
+                {galleryImages.map((img, idx) => (
                   <button
-                    key={idx}
+                    key={`${img}-${idx}`}
                     onClick={() => setActiveImageIndex(idx)}
                     className={`relative w-20 h-20 flex-shrink-0 overflow-hidden rounded-xl transition-all ${
                       idx === activeImageIndex 
@@ -206,7 +210,15 @@ export default function ProductDetailPage() {
                     }`}
                     data-testid={`button-thumbnail-${idx}`}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <img
+                      src={getOptimizedUrl(img, { width: IMAGE_WIDTHS.THUMBNAIL })}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      width={80}
+                      height={80}
+                    />
                   </button>
                 ))}
               </div>

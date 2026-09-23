@@ -519,7 +519,25 @@ export async function registerRoutes(
       
       // Generate WhatsApp notification URL for admin
       const whatsappNotifyUrl = sendWhatsAppNotification(order);
-      
+
+      // Automatically send invoice email to customer (non-blocking)
+      if (order.email) {
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers.host;
+        const invoiceUrl = `${protocol}://${host}/invoice/${order.orderNumber}`;
+        sendInvoiceEmail(order, invoiceUrl)
+          .then(result => {
+            if (result.success) {
+              console.log(`[Order] ${order.orderNumber}: Confirmation email sent to ${order.email}`);
+            } else {
+              console.warn(`[Order] ${order.orderNumber}: Email send failed - ${result.error}`);
+            }
+          })
+          .catch(err => console.error(`[Order] ${order.orderNumber}: Email send error:`, err));
+      } else {
+        console.log(`[Order] ${order.orderNumber}: No customer email provided, skipping confirmation email.`);
+      }
+
       res.status(201).json({ ...order, whatsappNotifyUrl });
     } catch (err) {
       if (err instanceof z.ZodError) {

@@ -17,6 +17,22 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Performance: enable minification & tree-shaking
+    target: "es2020",
+    minify: "esbuild",
+    cssMinify: true,
+    // Code-split vendor chunks for better caching
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-ui": ["framer-motion", "lucide-react"],
+          "vendor-query": ["@tanstack/react-query"],
+        },
+      },
+    },
+    // Increase chunk warning limit (recharts is heavy)
+    chunkSizeWarningLimit: 600,
   },
   server: {
     fs: {

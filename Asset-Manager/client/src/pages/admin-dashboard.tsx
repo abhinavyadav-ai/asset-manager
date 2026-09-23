@@ -6,6 +6,7 @@ import { Link, useLocation } from "wouter";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getOptimizedUrl } from "@/lib/cloudinary";
 import { 
   LogOut, 
   Package, 
@@ -389,59 +390,76 @@ function ProductsListView({ onEdit, onAdd }: { onEdit: (id: number) => void; onA
         </div>
       ) : (
         <div className="grid gap-4">
-          {filtered.map((product) => (
-            <div 
-              key={product.id} 
-              className="bg-[#0a0a0a] border border-white/5 rounded-xl p-4"
-              data-testid={`product-row-${product.id}`}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-secondary/30 overflow-hidden flex-shrink-0">
-                  <img 
-                    src={product.images[0]} 
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-white truncate">{product.name}</h3>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="gold-text font-bold">₹{product.price}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      (product.stock ?? 0) > 5 ? 'bg-green-500/20 text-green-400' : 
-                      (product.stock ?? 0) > 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      Stock: {product.stock ?? 0}
-                    </span>
+          {filtered.map((product) => {
+            const productImages = (product.images ?? []).filter(Boolean);
+            const primaryImage = productImages[0] || "https://images.unsplash.com/photo-1602825266977-148c3b4d241d?w=800&q=80";
+
+            return (
+              <div 
+                key={product.id} 
+                className="bg-[#0a0a0a] border border-white/5 rounded-xl p-4"
+                data-testid={`product-row-${product.id}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex -space-x-2 overflow-hidden flex-shrink-0">
+                    {productImages.slice(0, 3).map((img, index) => (
+                      <div key={`${product.id}-${img}-${index}`} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-[#0a0a0a] overflow-hidden bg-secondary/30">
+                        <img 
+                          src={img} 
+                          alt={`${product.name} ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                    {productImages.length === 0 && (
+                      <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-[#0a0a0a] overflow-hidden bg-secondary/30">
+                        <img src={primaryImage} alt={product.name} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-white truncate">{product.name}</h3>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="gold-text font-bold">₹{product.price}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        (product.stock ?? 0) > 5 ? 'bg-green-500/20 text-green-400' : 
+                        (product.stock ?? 0) > 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        Stock: {product.stock ?? 0}
+                      </span>
+                      {productImages.length > 1 && (
+                        <span className="text-xs text-muted-foreground">{productImages.length} images</span>
+                      )}
+                    </div>
                   </div>
                 </div>
+                {/* Action buttons - always visible at bottom */}
+                <div className="flex gap-2 mt-3 pt-3 border-t border-white/5">
+                  <button 
+                    onClick={() => onEdit(product.id)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-colors font-medium"
+                    data-testid={`button-edit-${product.id}`}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span>Edit</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (confirm('Delete this product?')) {
+                        deleteMutation.mutate(product.id);
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors font-medium"
+                    data-testid={`button-delete-${product.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete</span>
+                  </button>
+                </div>
               </div>
-              {/* Action buttons - always visible at bottom */}
-              <div className="flex gap-2 mt-3 pt-3 border-t border-white/5">
-                <button 
-                  onClick={() => onEdit(product.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-colors font-medium"
-                  data-testid={`button-edit-${product.id}`}
-                >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Edit</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    if (confirm('Delete this product?')) {
-                      deleteMutation.mutate(product.id);
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors font-medium"
-                  data-testid={`button-delete-${product.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete</span>
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -687,7 +705,7 @@ function ProductEditView({ productId, onBack }: { productId: number | null; onBa
             <div className="grid grid-cols-2 gap-3">
               {images.map((img, i) => (
                 <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-secondary/30">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={getOptimizedUrl(img, { width: 200 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" width={200} height={200} />
                   <button
                     type="button"
                     onClick={() => removeImage(i)}

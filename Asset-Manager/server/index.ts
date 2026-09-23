@@ -4,6 +4,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import compression from "compression";
+import { ensureIndexes } from "./performance";
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,6 +15,19 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// --- Performance: Gzip/Brotli compression for all responses ---
+app.use(
+  compression({
+    level: 6, // balanced speed vs compression
+    threshold: 1024, // only compress responses > 1KB
+    filter: (req, res) => {
+      // Don't compress if client doesn't accept it
+      if (req.headers["x-no-compression"]) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 app.use(
   express.json({
@@ -61,7 +76,35 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- Performance: API caching headers for public GET endpoints ---
+app.use((req, res, next) => {
+  if (req.method === "GET" && req.path.startsWith("/api")) {
+    // Short cache for frequently-polled public data
+    const publicPatterns = [
+      /^\/api\/products$/,
+      /^\/api\/products\/\d+$/,
+      /^\/api\/products\/\d+\/reviews$/,
+      /^\/api\/flash-sales\/active$/,
+      /^\/api\/bulk-discounts\/active$/,
+      /^\/api\/razorpay\/config$/,
+      /^\/api\/settings\/[^/]+$/,
+    ];
+    const isPublic = publicPatterns.some((p) => p.test(req.path));
+    if (isPublic) {
+      // 60s stale-while-revalidate = fast repeat loads, background refresh
+      res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=60");
+    } else {
+      // Authenticated / private routes — no cache
+      res.setHeader("Cache-Control", "private, no-cache");
+    }
+  }
+  next();
+});
+
 (async () => {
+  // Create DB indexes in background (non-blocking)
+  ensureIndexes().catch(() => {});
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -87,7 +130,7 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || "5000", 10);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Server running on port", PORT);

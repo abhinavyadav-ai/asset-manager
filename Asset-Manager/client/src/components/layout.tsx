@@ -207,7 +207,34 @@ export function Navbar() {
           </AnimatePresence>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center gap-3">
+          <div className="md:hidden flex items-center gap-1">
+            {/* Mobile Search */}
+            <button 
+              onClick={() => setShowSearch(!showSearch)}
+              className="relative p-3 rounded-xl hover:bg-white/5 transition-colors"
+              data-testid="nav-search-mobile"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+
+            {/* Mobile Wishlist */}
+            <Link 
+              href="/wishlist" 
+              className="relative p-3 rounded-xl hover:bg-white/5 transition-colors"
+              data-testid="nav-wishlist-mobile"
+            >
+              <Heart className="w-5 h-5" />
+              {wishlistCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-background text-xs font-bold rounded-full flex items-center justify-center"
+                >
+                  {wishlistCount > 9 ? '9+' : wishlistCount}
+                </motion.span>
+              )}
+            </Link>
+
             {/* Mobile Cart */}
             <Link 
               href="/cart" 
@@ -261,6 +288,22 @@ export function Navbar() {
                   {link.name}
                 </Link>
               ))}
+              <Link 
+                href="/wishlist"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "px-5 py-4 text-base font-medium tracking-wide rounded-xl transition-colors flex items-center gap-3",
+                  isActive("/wishlist") ? "gold-text bg-white/5" : "text-foreground hover:bg-white/5"
+                )}
+              >
+                <Heart className="w-5 h-5" />
+                Wishlist
+                {wishlistCount > 0 && (
+                  <span className="ml-auto w-6 h-6 bg-primary text-background text-xs font-bold rounded-full flex items-center justify-center">
+                    {wishlistCount > 9 ? '9+' : wishlistCount}
+                  </span>
+                )}
+              </Link>
               <Link 
                 href="/products" 
                 onClick={() => setIsOpen(false)}
