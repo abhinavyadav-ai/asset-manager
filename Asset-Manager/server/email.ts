@@ -1,5 +1,14 @@
 import { Resend } from 'resend';
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -70,10 +79,10 @@ export async function sendInvoiceEmail(order: Order, invoiceUrl: string): Promis
     const items = order.items as OrderItem[];
     const itemsHtml = items.map(item => `
       <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #eee;">${item.name}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">₹${item.price.toFixed(2)}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">₹${(item.price * item.quantity).toFixed(2)}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">${escapeHtml(item.name)}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${escapeHtml(item.quantity)}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">₹${escapeHtml(item.price.toFixed(2))}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">₹${escapeHtml((item.price * item.quantity).toFixed(2))}</td>
       </tr>
     `).join('');
 
@@ -93,12 +102,12 @@ export async function sendInvoiceEmail(order: Order, invoiceUrl: string): Promis
     
     <div style="padding: 30px;">
       <h2 style="color: #333; margin: 0 0 20px 0;">Thank you for your order!</h2>
-      <p style="color: #666; line-height: 1.6;">Dear ${order.customerName},</p>
+      <p style="color: #666; line-height: 1.6;">Dear ${escapeHtml(order.customerName)},</p>
       <p style="color: #666; line-height: 1.6;">Your order has been successfully placed. Please find your invoice details below.</p>
       
       <div style="background: #f9f9f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
         <h3 style="color: #F5A623; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Order Details</h3>
-        <p style="color: #333; margin: 5px 0;"><strong>Order Number:</strong> ${order.orderNumber}</p>
+        <p style="color: #333; margin: 5px 0;"><strong>Order Number:</strong> ${escapeHtml(order.orderNumber)}</p>
         <p style="color: #333; margin: 5px 0;"><strong>Date:</strong> ${new Date(order.createdAt || new Date()).toLocaleDateString('en-IN')}</p>
         <p style="color: #333; margin: 5px 0;"><strong>Payment Method:</strong> ${getPaymentMethodName(order.paymentMethod)}</p>
       </div>
@@ -124,7 +133,7 @@ export async function sendInvoiceEmail(order: Order, invoiceUrl: string): Promis
         </div>
         ${order.discountAmount && order.discountAmount > 0 ? `
         <div style="display: flex; justify-content: space-between; padding: 8px 0; color: #22c55e;">
-          <span>Discount ${order.discountCode ? `(${order.discountCode})` : ''}</span>
+          <span>Discount ${order.discountCode ? `(${escapeHtml(order.discountCode)})` : ''}</span>
           <span>-₹${order.discountAmount.toFixed(2)}</span>
         </div>
         ` : ''}
@@ -140,14 +149,14 @@ export async function sendInvoiceEmail(order: Order, invoiceUrl: string): Promis
       
       <div style="background: #f9f9f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
         <h3 style="color: #F5A623; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Delivery Address</h3>
-        <p style="color: #333; margin: 5px 0;">${order.customerName}</p>
-        <p style="color: #666; margin: 5px 0;">${order.address}</p>
-        <p style="color: #666; margin: 5px 0;">${order.city}, ${order.state} - ${order.pincode}</p>
-        <p style="color: #666; margin: 5px 0;">Phone: ${order.phone}</p>
+        <p style="color: #333; margin: 5px 0;">${escapeHtml(order.customerName)}</p>
+        <p style="color: #666; margin: 5px 0;">${escapeHtml(order.address)}</p>
+        <p style="color: #666; margin: 5px 0;">${escapeHtml(order.city)}, ${escapeHtml(order.state)} - ${escapeHtml(order.pincode)}</p>
+        <p style="color: #666; margin: 5px 0;">Phone: ${escapeHtml(order.phone)}</p>
       </div>
       
       <div style="text-align: center; margin: 30px 0;">
-        <a href="${invoiceUrl}" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #F5A623 0%, #D4920A 100%); color: #000; text-decoration: none; border-radius: 8px; font-weight: 600;">View Full Invoice</a>
+        <a href="${escapeHtml(invoiceUrl)}" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #F5A623 0%, #D4920A 100%); color: #000; text-decoration: none; border-radius: 8px; font-weight: 600;">View Full Invoice</a>
       </div>
     </div>
     

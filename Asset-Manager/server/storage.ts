@@ -14,6 +14,7 @@ import {
   type InsertProduct,
   type Order,
   type InsertOrder,
+  type OrderItem,
   type Coupon,
   type InsertCoupon,
   type SiteSetting,
@@ -24,7 +25,7 @@ import {
   type FlashSale,
   type InsertFlashSale,
 } from "@shared/schema";
-import { eq, desc, and, gt, or, isNull, lte, gte } from "drizzle-orm";
+import { eq, desc, and, gt, or, isNull, lte, gte, lt, sql } from "drizzle-orm";
 import session from "express-session";
 import { PgSessionStore } from "./pg-session-store";
 
@@ -49,8 +50,10 @@ export interface IStorage {
   getOrder(id: number): Promise<Order | undefined>;
   getOrderByNumber(orderNumber: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
+  createOrderWithInventory(order: InsertOrder, items: OrderItem[], couponCode?: string | null): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
   updateOrderPayment(id: number, paymentStatus: string, razorpayPaymentId?: string): Promise<Order>;
+  setRazorpayOrderId(id: number, razorpayOrderId: string): Promise<Order>;
   updateOrderTracking(id: number, trackingNumber: string, deliveryPartner: string): Promise<Order>;
   deleteOrder(id: number): Promise<void>;
 
@@ -183,6 +186,34 @@ export class DatabaseStorage implements IStorage {
     return order;
   }
 
+  async createOrderWithInventory(insertOrder: InsertOrder, items: OrderItem[], couponCode?: string | null): Promise<Order> {
+    return db.transaction(async (tx) => {
+      for (const item of items) {
+        const updated = await tx
+          .update(products)
+          .set({ stock: sql`${products.stock} - ${item.quantity}` })
+          .where(and(eq(products.id, item.productId), gte(products.stock, item.quantity)))
+          .returning({ id: products.id });
+        if (updated.length === 0) throw new Error("Inventory changed; please review your cart");
+      }
+
+      if (couponCode) {
+        const updated = await tx
+          .update(coupons)
+          .set({ usedCount: sql`coalesce(${coupons.usedCount}, 0) + 1` })
+          .where(and(
+            eq(coupons.code, couponCode),
+            eq(coupons.isActive, true),
+            or(isNull(coupons.usageLimit), lt(coupons.usedCount, coupons.usageLimit)),
+          ));
+        if (updated.rowCount === 0) throw new Error("Coupon usage limit reached");
+      }
+
+      const [created] = await tx.insert(orders).values(insertOrder).returning();
+      return created;
+    });
+  }
+
   async updateOrderStatus(id: number, status: string): Promise<Order> {
     const [updated] = await db
       .update(orders)
@@ -200,6 +231,15 @@ export class DatabaseStorage implements IStorage {
         ...(razorpayPaymentId && { razorpayPaymentId }),
         ...(paymentStatus === 'paid' && { status: 'confirmed' })
       })
+      .where(eq(orders.id, id))
+      .returning();
+    return updated;
+  }
+
+  async setRazorpayOrderId(id: number, razorpayOrderId: string): Promise<Order> {
+    const [updated] = await db
+      .update(orders)
+      .set({ razorpayOrderId })
       .where(eq(orders.id, id))
       .returning();
     return updated;

@@ -1,20 +1,31 @@
-/**
- * Upload image to Cloudinary using unsigned upload (no API key/secret needed).
- * Cloud name and upload preset are hardcoded — zero env vars required.
- */
+import { createHash } from "crypto";
 
-const CLOUD_NAME = "dm2qmwec5";
-const UPLOAD_PRESET = "ml_default";
+function getCloudinaryConfig() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error("Cloudinary signed upload configuration is missing");
+  }
+  return { cloudName, apiKey, apiSecret };
+}
 
 export async function uploadToCloudinary(base64Data: string): Promise<string> {
-  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = createHash("sha1")
+    .update(`folder=products&timestamp=${timestamp}${apiSecret}`)
+    .digest("hex");
+  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
 
   const formData = new FormData();
   formData.append("file", base64Data);
-  formData.append("upload_preset", UPLOAD_PRESET);
+  formData.append("api_key", apiKey);
+  formData.append("timestamp", String(timestamp));
+  formData.append("signature", signature);
   formData.append("folder", "products");
 
-  console.log(`[Cloudinary] Uploading (unsigned, preset=${UPLOAD_PRESET}) to ${endpoint}`);
+  console.log(`[Cloudinary] Uploading signed image to ${new URL(endpoint).origin}`);
 
   const response = await fetch(endpoint, { method: "POST", body: formData });
   const data = await response.json();

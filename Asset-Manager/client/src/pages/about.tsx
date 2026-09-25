@@ -11,7 +11,7 @@ export default function AboutPage() {
       <section className="pt-32 pb-20 relative overflow-hidden">
         <div className="absolute inset-0">
           <img 
-            src="https://images.unsplash.com/photo-1603006905003-be475563bc59?q=80&w=2574&auto=format&fit=crop"
+            src="/images/candle-6_2.jpg"
             alt="Candle Making"
             className="w-full h-full object-cover opacity-20"
           />
@@ -74,7 +74,7 @@ export default function AboutPage() {
             >
               <div className="aspect-[4/5] rounded-2xl overflow-hidden neo-card">
                 <img 
-                  src="https://images.unsplash.com/photo-1594897030264-ab7d87efc473?q=80&w=2574&auto=format&fit=crop"
+                  src="/images/candle-1_4.jpg"
                   alt="Handcrafted Candle"
                   className="w-full h-full object-cover"
                 />

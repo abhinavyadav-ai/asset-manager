@@ -74,12 +74,15 @@ export function useUpload(options: UseUploadOptions = {}) {
         // Create FormData and upload directly to server
         const formData = new FormData();
         formData.append("file", file);
+        const csrf = await fetch("/api/csrf-token", { credentials: "include" }).then(res => res.json()) as { token: string };
         
         setProgress(30);
         
         const response = await fetch("/api/uploads/file", {
           method: "POST",
           body: formData,
+          headers: { "x-csrf-token": csrf.token },
+          credentials: "include",
         });
 
         const data = await response.json();

@@ -199,7 +199,7 @@ export default function Checkout() {
   const createOrder = useMutation({
     mutationFn: async (orderData: any) => {
       const response = await apiRequest("POST", "/api/orders", orderData);
-      return response.json() as Promise<Order & { whatsappNotifyUrl?: string }>;
+      return response.json() as Promise<Order & { whatsappNotifyUrl?: string; orderAccessToken?: string }>;
     },
     onSuccess: (order) => {
       clearCart();
@@ -207,7 +207,7 @@ export default function Checkout() {
       if (order.whatsappNotifyUrl) {
         window.open(order.whatsappNotifyUrl, '_blank');
       }
-      navigate(`/order-confirmation/${order.orderNumber}`);
+      navigate(`/order-confirmation/${order.orderNumber}?token=${encodeURIComponent(order.orderAccessToken || "")}`);
     },
     onError: (error) => {
       toast({
@@ -299,21 +299,14 @@ export default function Checkout() {
       
       setIsProcessingPayment(true);
       try {
-        // Create Razorpay order
-        const razorpayOrderRes = await apiRequest("POST", "/api/razorpay/create-order", {
-          amount: finalTotal,
-          currency: "INR",
-          receipt: `order_${Date.now()}`,
-          notes: {
-            customerName: formData.customerName,
-            phone: formData.phone,
-          },
-        });
-        const razorpayOrder = await razorpayOrderRes.json();
-        
-        // First create our order
+        // Create our order first so the server owns the authoritative amount.
         const orderRes = await apiRequest("POST", "/api/orders", orderData);
         const order = await orderRes.json() as Order;
+
+        const razorpayOrderRes = await apiRequest("POST", "/api/razorpay/create-order", {
+          orderId: order.id,
+        });
+        const razorpayOrder = await razorpayOrderRes.json();
         
         // Open Razorpay checkout
         const options = {
@@ -344,7 +337,7 @@ export default function Checkout() {
               
               if (verifyData.verified) {
                 clearCart();
-                navigate(`/order-confirmation/${order.orderNumber}`);
+                navigate(`/order-confirmation/${order.orderNumber}?token=${(order as Order & { orderAccessToken?: string }).orderAccessToken || ""}`);
               } else {
                 toast({
                   title: "Payment Failed",

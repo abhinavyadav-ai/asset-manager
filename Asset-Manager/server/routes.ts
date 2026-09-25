@@ -1,21 +1,22 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
+import { requireAdmin, setupAuth } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import crypto from "crypto";
 import type { OrderItem, Order } from "@shared/schema";
-import { insertCouponSchema, insertReviewSchema, insertBulkDiscountSchema, insertFlashSaleSchema } from "@shared/schema";
+import { createOrderRequestSchema, insertCouponSchema, insertReviewSchema, insertBulkDiscountSchema, insertFlashSaleSchema } from "@shared/schema";
 import Razorpay from "razorpay";
 import { sendInvoiceEmail } from "./email";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import { uploadToCloudinary } from "./cloudinary";
 
 // Configure multer for memory storage (files stay in buffer, not disk)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) {
       cb(null, true);
@@ -24,6 +25,20 @@ const upload = multer({
     }
   },
 });
+
+const uploadRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+});
+
+function isSupportedImage(buffer: Buffer, mimetype: string): boolean {
+  if (mimetype === "image/jpeg") return buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  if (mimetype === "image/png") return buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if (mimetype === "image/webp") return buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
+  return false;
+}
 
 // Initialize Razorpay if credentials are available
 let razorpayInstance: Razorpay | null = null;
@@ -77,6 +92,22 @@ function generateOrderNumber(): string {
   return `${prefix}-${timestamp}-${random}`;
 }
 
+function createOrderAccessToken(orderNumber: string): string {
+  return crypto.createHmac("sha256", process.env.SESSION_SECRET as string).update(orderNumber).digest("hex");
+}
+
+function hasValidOrderAccessToken(orderNumber: string, token: unknown): boolean {
+  if (typeof token !== "string") return false;
+  const expected = createOrderAccessToken(orderNumber);
+  return token.length === expected.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+}
+
+function getPublicOrigin(req: { protocol: string; get(name: string): string | undefined }): string {
+  if (process.env.PUBLIC_APP_URL) return process.env.PUBLIC_APP_URL.replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") return "https://luxecandle.in";
+  return `${req.protocol}://${req.get("host")}`;
+}
+
 // Generate customer invoice WhatsApp message
 function generateCustomerInvoiceWhatsApp(order: Order, invoiceUrl: string): string {
   const items = (order.items as OrderItem[]).map(i => `• ${i.name} x${i.quantity} - ₹${(i.price * i.quantity).toFixed(0)}`).join('\n');
@@ -106,15 +137,24 @@ function generateCustomerInvoiceWhatsApp(order: Order, invoiceUrl: string): stri
   return `https://wa.me/${order.phone?.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Generate HTML invoice
 function generateInvoiceHTML(order: Order): string {
   const items = order.items as OrderItem[];
   const itemsHTML = items.map(item => `
     <tr>
-      <td style="padding: 12px; border-bottom: 1px solid #333;">${item.name}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #333; text-align: center;">${item.quantity}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #333; text-align: right;">₹${item.price.toFixed(2)}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #333; text-align: right;">₹${(item.price * item.quantity).toFixed(2)}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #333;">${escapeHtml(item.name)}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #333; text-align: center;">${escapeHtml(item.quantity)}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #333; text-align: right;">₹${escapeHtml(item.price.toFixed(2))}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #333; text-align: right;">₹${escapeHtml((item.price * item.quantity).toFixed(2))}</td>
     </tr>
   `).join('');
 
@@ -124,7 +164,7 @@ function generateInvoiceHTML(order: Order): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invoice - ${order.orderNumber} | Luxe Candle</title>
+  <title>Invoice - ${escapeHtml(order.orderNumber)} | Luxe Candle</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
@@ -257,20 +297,20 @@ function generateInvoiceHTML(order: Order): string {
       <div class="invoice-info">
         <div>
           <h3>Invoice To</h3>
-          <p><strong>${order.customerName}</strong></p>
-          <p>${order.phone}</p>
-          ${order.email ? `<p>${order.email}</p>` : ''}
-          <p>${order.address}</p>
-          <p>${order.city}, ${order.state} - ${order.pincode}</p>
+          <p><strong>${escapeHtml(order.customerName)}</strong></p>
+          <p>${escapeHtml(order.phone)}</p>
+          ${order.email ? `<p>${escapeHtml(order.email)}</p>` : ''}
+          <p>${escapeHtml(order.address)}</p>
+          <p>${escapeHtml(order.city)}, ${escapeHtml(order.state)} - ${escapeHtml(order.pincode)}</p>
         </div>
         <div>
           <h3>Invoice Details</h3>
-          <p><strong>Invoice #:</strong> ${order.orderNumber}</p>
-          <p><strong>Date:</strong> ${new Date(order.createdAt || new Date()).toLocaleDateString('en-IN')}</p>
-          <p><strong>Payment:</strong> ${getPaymentMethodName(order.paymentMethod)}</p>
+          <p><strong>Invoice #:</strong> ${escapeHtml(order.orderNumber)}</p>
+          <p><strong>Date:</strong> ${escapeHtml(new Date(order.createdAt || new Date()).toLocaleDateString('en-IN'))}</p>
+          <p><strong>Payment:</strong> ${escapeHtml(getPaymentMethodName(order.paymentMethod))}</p>
           <p>
             <span class="status-badge ${order.paymentStatus === 'paid' ? 'status-paid' : 'status-pending'}">
-              ${order.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
+              ${escapeHtml(order.paymentStatus === 'paid' ? 'Paid' : 'Pending')}
             </span>
           </p>
         </div>
@@ -297,7 +337,7 @@ function generateInvoiceHTML(order: Order): string {
         </div>
         ${order.discountAmount && order.discountAmount > 0 ? `
         <div class="totals-row">
-          <span>Discount ${order.discountCode ? `(${order.discountCode})` : ''}</span>
+          <span>Discount ${order.discountCode ? `(${escapeHtml(order.discountCode)})` : ''}</span>
           <span>-₹${order.discountAmount.toFixed(2)}</span>
         </div>
         ` : ''}
@@ -330,10 +370,13 @@ export async function registerRoutes(
   setupAuth(app);
 
   // === Image Upload (Cloudinary) ===
-  app.post("/api/uploads/file", upload.single("file"), async (req, res) => {
+  app.post("/api/uploads/file", requireAdmin, uploadRateLimit, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file" });
+      }
+      if (!isSupportedImage(req.file.buffer, req.file.mimetype)) {
+        return res.status(400).json({ error: "Only valid JPEG, PNG, or WebP images are allowed" });
       }
 
       const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
@@ -358,7 +401,7 @@ export async function registerRoutes(
     res.json(product);
   });
 
-  app.post(api.products.create.path, async (req, res) => {
+  app.post(api.products.create.path, requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const input = api.products.create.input.parse(req.body);
@@ -372,7 +415,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.products.update.path, async (req, res) => {
+  app.put(api.products.update.path, requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const input = api.products.update.input.parse(req.body);
@@ -386,7 +429,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/products/:id', async (req, res) => {
+  app.patch('/api/products/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const partialSchema = api.products.update.input.partial();
@@ -404,26 +447,29 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.products.delete.path, async (req, res) => {
+  app.delete(api.products.delete.path, requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     await storage.deleteProduct(Number(req.params.id));
     res.status(204).send();
   });
 
   // === Orders ===
-  app.get(api.orders.list.path, async (req, res) => {
+  app.get(api.orders.list.path, requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const orders = await storage.getOrders();
     res.json(orders);
   });
 
   app.get('/api/orders/number/:orderNumber', async (req, res) => {
+    if (!hasValidOrderAccessToken(req.params.orderNumber, req.query.token)) {
+      return res.status(403).json({ message: "Order access token required" });
+    }
     const order = await storage.getOrderByNumber(req.params.orderNumber);
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json(order);
   });
 
-  app.get(api.orders.get.path, async (req, res) => {
+  app.get(api.orders.get.path, requireAdmin, async (req, res) => {
     const order = await storage.getOrder(Number(req.params.id));
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json(order);
@@ -431,33 +477,39 @@ export async function registerRoutes(
 
   app.post(api.orders.create.path, async (req, res) => {
     try {
-      // Validate request body
-      const items = req.body.items as OrderItem[];
-      if (!items || items.length === 0) {
-        return res.status(400).json({ message: "Cart is empty" });
+      const parsed = createOrderRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid order" });
+      }
+      const request = parsed.data;
+      const productIds = request.items.map(item => item.productId);
+      if (new Set(productIds).size !== productIds.length) {
+        return res.status(400).json({ message: "Duplicate products are not allowed" });
       }
       
       // Check stock availability for all items and calculate subtotal
       let calculatedSubtotal = 0;
-      for (const item of items) {
+      const items: OrderItem[] = [];
+      for (const item of request.items) {
         const product = await storage.getProduct(item.productId);
-        if (!product) {
-          return res.status(400).json({ message: `Product ${item.name} not found` });
+        if (!product || !product.isActive) {
+          return res.status(400).json({ message: `Product ${item.productId} is not available` });
         }
         if ((product.stock ?? 0) < item.quantity) {
           return res.status(400).json({ 
-            message: `Insufficient stock for ${item.name}. Available: ${product.stock ?? 0}` 
+            message: `Insufficient stock for ${product.name}. Available: ${product.stock ?? 0}`
           });
         }
         calculatedSubtotal += product.price * item.quantity;
+        items.push({ productId: product.id, name: product.name, quantity: item.quantity, price: product.price, image: product.images[0] });
       }
       
       // Server-side coupon validation
       let discountAmount = 0;
       let validatedCouponCode: string | null = null;
       
-      if (req.body.discountCode) {
-        const coupon = await storage.getCouponByCode(req.body.discountCode);
+      if (request.discountCode) {
+        const coupon = await storage.getCouponByCode(request.discountCode);
         if (!coupon) {
           return res.status(400).json({ message: "Invalid or expired coupon code" });
         }
@@ -497,34 +549,32 @@ export async function registerRoutes(
       
       const orderNumber = generateOrderNumber();
       const input = {
-        ...req.body,
         orderNumber,
+        customerName: request.customerName,
+        email: request.email || null,
+        phone: request.phone,
+        address: request.address,
+        city: request.city,
+        state: request.state,
+        pincode: request.pincode,
+        items,
         subtotal: calculatedSubtotal,
         shipping,
         discountCode: validatedCouponCode,
         discountAmount,
         total: calculatedTotal,
+        paymentMethod: request.paymentMethod,
+        paymentStatus: "pending",
+        status: "pending",
       };
-      const order = await storage.createOrder(input);
-      
-      // Update stock for each item
-      for (const item of items) {
-        await storage.updateStock(item.productId, item.quantity);
-      }
-      
-      // Increment coupon usage if coupon was applied
-      if (validatedCouponCode) {
-        await storage.incrementCouponUsage(validatedCouponCode);
-      }
+      const order = await storage.createOrderWithInventory(input, items, validatedCouponCode);
       
       // Generate WhatsApp notification URL for admin
       const whatsappNotifyUrl = sendWhatsAppNotification(order);
 
       // Automatically send invoice email to customer (non-blocking)
       if (order.email) {
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
-        const host = req.headers.host;
-        const invoiceUrl = `${protocol}://${host}/invoice/${order.orderNumber}`;
+        const invoiceUrl = `${getPublicOrigin(req)}/invoice/${order.orderNumber}?token=${createOrderAccessToken(order.orderNumber)}`;
         sendInvoiceEmail(order, invoiceUrl)
           .then(result => {
             if (result.success) {
@@ -538,7 +588,7 @@ export async function registerRoutes(
         console.log(`[Order] ${order.orderNumber}: No customer email provided, skipping confirmation email.`);
       }
 
-      res.status(201).json({ ...order, whatsappNotifyUrl });
+      res.status(201).json({ ...order, orderAccessToken: createOrderAccessToken(order.orderNumber), whatsappNotifyUrl });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
@@ -548,7 +598,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/orders/:id/status', async (req, res) => {
+  app.patch('/api/orders/:id/status', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const { status } = req.body;
@@ -564,7 +614,7 @@ export async function registerRoutes(
   });
 
   // Update order tracking
-  app.patch('/api/orders/:id/tracking', async (req, res) => {
+  app.patch('/api/orders/:id/tracking', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const { trackingNumber, deliveryPartner } = req.body;
@@ -579,7 +629,7 @@ export async function registerRoutes(
   });
 
   // Get WhatsApp notification URL for order
-  app.get('/api/orders/:id/whatsapp-notify', async (req, res) => {
+  app.get('/api/orders/:id/whatsapp-notify', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const order = await storage.getOrder(Number(req.params.id));
@@ -592,7 +642,7 @@ export async function registerRoutes(
   });
 
   // Delete order (admin only)
-  app.delete('/api/orders/:id', async (req, res) => {
+  app.delete('/api/orders/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const order = await storage.getOrder(Number(req.params.id));
@@ -608,6 +658,9 @@ export async function registerRoutes(
   
   // View invoice HTML page
   app.get('/invoice/:orderNumber', async (req, res) => {
+    if (!hasValidOrderAccessToken(req.params.orderNumber, req.query.token)) {
+      return res.status(403).send('Invoice access token required');
+    }
     try {
       const order = await storage.getOrderByNumber(req.params.orderNumber);
       if (!order) return res.status(404).send('Invoice not found');
@@ -620,16 +673,14 @@ export async function registerRoutes(
   });
 
   // Get invoice WhatsApp share link for customer (admin only)
-  app.get('/api/orders/:id/send-invoice', async (req, res) => {
+  app.get('/api/orders/:id/send-invoice', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const order = await storage.getOrder(Number(req.params.id));
       if (!order) return res.status(404).json({ message: "Order not found" });
       
       // Generate invoice URL
-      const protocol = req.headers['x-forwarded-proto'] || 'https';
-      const host = req.headers.host;
-      const invoiceUrl = `${protocol}://${host}/invoice/${order.orderNumber}`;
+      const invoiceUrl = `${getPublicOrigin(req)}/invoice/${order.orderNumber}?token=${createOrderAccessToken(order.orderNumber)}`;
       
       // Generate WhatsApp link to send to customer
       const customerWhatsAppUrl = generateCustomerInvoiceWhatsApp(order, invoiceUrl);
@@ -646,7 +697,7 @@ export async function registerRoutes(
   });
 
   // Send invoice via email (admin only)
-  app.post('/api/orders/:id/send-invoice-email', async (req, res) => {
+  app.post('/api/orders/:id/send-invoice-email', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const order = await storage.getOrder(Number(req.params.id));
@@ -656,9 +707,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Customer email not available" });
       }
       
-      const protocol = req.headers['x-forwarded-proto'] || 'https';
-      const host = req.headers.host;
-      const invoiceUrl = `${protocol}://${host}/invoice/${order.orderNumber}`;
+      const invoiceUrl = `${getPublicOrigin(req)}/invoice/${order.orderNumber}?token=${createOrderAccessToken(order.orderNumber)}`;
       
       const result = await sendInvoiceEmail(order, invoiceUrl);
       
@@ -687,7 +736,7 @@ export async function registerRoutes(
   });
 
   // Get all settings (admin only)
-  app.get('/api/settings', async (req, res) => {
+  app.get('/api/settings', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const settings = await storage.getAllSettings();
@@ -698,7 +747,7 @@ export async function registerRoutes(
   });
 
   // Set a setting (admin only)
-  app.post('/api/settings', async (req, res) => {
+  app.post('/api/settings', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const { key, value } = req.body;
@@ -729,21 +778,23 @@ export async function registerRoutes(
     }
     
     try {
-      const { amount, currency = "INR", receipt, notes } = req.body;
-      
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ message: "Invalid amount" });
+      const orderId = z.coerce.number().int().positive().parse(req.body.orderId);
+      const internalOrder = await storage.getOrder(orderId);
+      if (!internalOrder || internalOrder.paymentMethod !== "razorpay" || internalOrder.paymentStatus !== "pending") {
+        return res.status(400).json({ message: "Invalid payment order" });
       }
+      const amount = Math.round(internalOrder.total * 100);
       
       const options = {
-        amount: Math.round(amount * 100), // Razorpay expects amount in paise
-        currency,
-        receipt: receipt || `order_${Date.now()}`,
-        notes: notes || {},
+        amount,
+        currency: "INR",
+        receipt: internalOrder.orderNumber,
+        notes: { orderId: String(internalOrder.id) },
       };
       
-      const order = await razorpayInstance.orders.create(options);
-      res.json(order);
+      const providerOrder = await razorpayInstance.orders.create(options);
+      await storage.setRazorpayOrderId(orderId, providerOrder.id);
+      res.json(providerOrder);
     } catch (err: any) {
       console.error("Razorpay order creation error:", err);
       return res.status(500).json({ message: err.message || "Failed to create payment order" });
@@ -763,6 +814,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing payment verification data" });
       }
       
+      const internalOrder = await storage.getOrder(Number(orderId));
+      if (!internalOrder || internalOrder.razorpayOrderId !== razorpay_order_id || internalOrder.paymentStatus !== "pending") {
+        return res.status(400).json({ verified: false, message: "Payment order mismatch" });
+      }
+
+      const providerOrder = await razorpayInstance.orders.fetch(razorpay_order_id);
+      if (providerOrder.amount !== Math.round(internalOrder.total * 100) || providerOrder.currency !== "INR") {
+        return res.status(400).json({ verified: false, message: "Payment amount mismatch" });
+      }
+
       // Verify signature
       const body = razorpay_order_id + "|" + razorpay_payment_id;
       const expectedSignature = crypto
@@ -770,7 +831,8 @@ export async function registerRoutes(
         .update(body.toString())
         .digest("hex");
       
-      const isAuthentic = expectedSignature === razorpay_signature;
+      const isAuthentic = expectedSignature.length === razorpay_signature.length &&
+        crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(razorpay_signature));
       
       if (isAuthentic) {
         // Update order payment status
@@ -788,7 +850,7 @@ export async function registerRoutes(
   });
 
   // === Coupons ===
-  app.get('/api/coupons', async (req, res) => {
+  app.get('/api/coupons', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const coupons = await storage.getCoupons();
     res.json(coupons);
@@ -818,7 +880,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post('/api/coupons', async (req, res) => {
+  app.post('/api/coupons', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const input = insertCouponSchema.parse(req.body);
@@ -832,7 +894,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/coupons/:id', async (req, res) => {
+  app.patch('/api/coupons/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const coupon = await storage.updateCoupon(Number(req.params.id), req.body);
@@ -842,7 +904,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/coupons/:id', async (req, res) => {
+  app.delete('/api/coupons/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     await storage.deleteCoupon(Number(req.params.id));
     res.status(204).send();
@@ -851,7 +913,7 @@ export async function registerRoutes(
   // === Reviews ===
   
   // Get all reviews (admin)
-  app.get('/api/reviews', async (req, res) => {
+  app.get('/api/reviews', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const reviews = await storage.getReviews();
     res.json(reviews);
@@ -878,7 +940,7 @@ export async function registerRoutes(
   });
 
   // Approve a review (admin)
-  app.patch('/api/reviews/:id/approve', async (req, res) => {
+  app.patch('/api/reviews/:id/approve', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const review = await storage.approveReview(Number(req.params.id));
@@ -889,7 +951,7 @@ export async function registerRoutes(
   });
 
   // Delete a review (admin)
-  app.delete('/api/reviews/:id', async (req, res) => {
+  app.delete('/api/reviews/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     await storage.deleteReview(Number(req.params.id));
     res.status(204).send();
@@ -898,7 +960,7 @@ export async function registerRoutes(
   // === Bulk Discounts ===
   
   // Get all bulk discounts (admin)
-  app.get('/api/bulk-discounts', async (req, res) => {
+  app.get('/api/bulk-discounts', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const discounts = await storage.getBulkDiscounts();
     res.json(discounts);
@@ -911,7 +973,7 @@ export async function registerRoutes(
   });
 
   // Create bulk discount (admin)
-  app.post('/api/bulk-discounts', async (req, res) => {
+  app.post('/api/bulk-discounts', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const input = insertBulkDiscountSchema.parse(req.body);
@@ -926,7 +988,7 @@ export async function registerRoutes(
   });
 
   // Update bulk discount (admin)
-  app.patch('/api/bulk-discounts/:id', async (req, res) => {
+  app.patch('/api/bulk-discounts/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const discount = await storage.updateBulkDiscount(Number(req.params.id), req.body);
@@ -937,7 +999,7 @@ export async function registerRoutes(
   });
 
   // Delete bulk discount (admin)
-  app.delete('/api/bulk-discounts/:id', async (req, res) => {
+  app.delete('/api/bulk-discounts/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     await storage.deleteBulkDiscount(Number(req.params.id));
     res.status(204).send();
@@ -946,7 +1008,7 @@ export async function registerRoutes(
   // === Flash Sales ===
   
   // Get all flash sales (admin)
-  app.get('/api/flash-sales', async (req, res) => {
+  app.get('/api/flash-sales', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const sales = await storage.getFlashSales();
     res.json(sales);
@@ -959,7 +1021,7 @@ export async function registerRoutes(
   });
 
   // Create flash sale (admin)
-  app.post('/api/flash-sales', async (req, res) => {
+  app.post('/api/flash-sales', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const input = insertFlashSaleSchema.parse(req.body);
@@ -974,7 +1036,7 @@ export async function registerRoutes(
   });
 
   // Update flash sale (admin)
-  app.patch('/api/flash-sales/:id', async (req, res) => {
+  app.patch('/api/flash-sales/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const sale = await storage.updateFlashSale(Number(req.params.id), req.body);
@@ -985,7 +1047,7 @@ export async function registerRoutes(
   });
 
   // Delete flash sale (admin)
-  app.delete('/api/flash-sales/:id', async (req, res) => {
+  app.delete('/api/flash-sales/:id', requireAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     await storage.deleteFlashSale(Number(req.params.id));
     res.status(204).send();

@@ -6,9 +6,17 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import compression from "compression";
 import { ensureIndexes } from "./performance";
+import rateLimit from "express-rate-limit";
 
 const app = express();
 const httpServer = createServer(app);
+
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+}));
 
 declare module "http" {
   interface IncomingMessage {
@@ -31,6 +39,7 @@ app.use(
 
 app.use(
   express.json({
+    limit: "100kb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },

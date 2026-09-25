@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role").notNull().default("customer"),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
@@ -84,6 +85,24 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true, 
   createdAt: true 
 });
+
+export const createOrderRequestSchema = z.object({
+  customerName: z.string().trim().min(1).max(120),
+  email: z.union([z.string().trim().email().max(320), z.literal("")]).optional(),
+  phone: z.string().trim().min(7).max(30),
+  address: z.string().trim().min(1).max(500),
+  city: z.string().trim().min(1).max(100),
+  state: z.string().trim().min(1).max(100),
+  pincode: z.string().trim().min(3).max(20),
+  items: z.array(z.object({
+    productId: z.coerce.number().int().positive(),
+    quantity: z.coerce.number().int().positive().max(100),
+  })).min(1).max(50),
+  discountCode: z.string().trim().max(50).optional(),
+  paymentMethod: z.enum(["razorpay", "upi", "cod"]),
+});
+
+export type CreateOrderRequest = z.infer<typeof createOrderRequestSchema>;
 
 // Types
 export type User = typeof users.$inferSelect;

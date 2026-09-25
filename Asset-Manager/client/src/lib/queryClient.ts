@@ -12,9 +12,15 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
+    const csrfResponse = await fetch("/api/csrf-token", { credentials: "include" });
+    const csrfData = await csrfResponse.json() as { token: string };
+    headers["x-csrf-token"] = csrfData.token;
+  }
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });

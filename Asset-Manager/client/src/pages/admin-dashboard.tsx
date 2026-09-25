@@ -1316,11 +1316,7 @@ function SettingsView() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: { key: string; value: string }) => {
-      const res = await apiRequest('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify(data),
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const res = await apiRequest('POST', '/api/settings', data);
       return res;
     },
     onSuccess: () => {
@@ -1371,9 +1367,9 @@ function SettingsView() {
 
     setIsUploading(true);
     try {
-      const url = await uploadFile(file, 'public');
-      if (url) {
-        saveMutation.mutate({ key: 'logo_url', value: url });
+      const uploadResponse = await uploadFile(file);
+      if (uploadResponse) {
+        saveMutation.mutate({ key: 'logo_url', value: uploadResponse.objectPath });
       }
     } catch {
       toast({ title: "Upload failed", description: "Failed to upload logo", variant: "destructive" });
@@ -1928,7 +1924,7 @@ function FlashSalesView() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { title: string; description?: string; discountPercent?: number; startDate: string; endDate: string; isActive: boolean }) => {
+    mutationFn: async (data: { title: string; description?: string; discountPercent?: number; bannerImage?: string; startDate: string; endDate: string; isActive: boolean }) => {
       await apiRequest('POST', '/api/flash-sales', data);
     },
     onSuccess: () => {

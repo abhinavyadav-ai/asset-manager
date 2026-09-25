@@ -13,7 +13,8 @@ export default function OrderConfirmation() {
   const { data: order, isLoading, error } = useQuery<Order>({
     queryKey: ['/api/orders/number', orderNumber],
     queryFn: async () => {
-      const res = await fetch(`/api/orders/number/${orderNumber}`);
+      const token = new URLSearchParams(window.location.search).get("token") || "";
+      const res = await fetch(`/api/orders/number/${orderNumber}?token=${encodeURIComponent(token)}`);
       if (!res.ok) throw new Error('Order not found');
       return res.json();
     },

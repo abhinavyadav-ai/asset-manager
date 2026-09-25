@@ -58,8 +58,10 @@ function useLogoutMutation() {
 
   return useMutation({
     mutationFn: async () => {
+      const csrf = await fetch("/api/csrf-token", { credentials: "include" }).then(res => res.json()) as { token: string };
       const res = await fetch(api.auth.logout.path, {
         method: api.auth.logout.method,
+        headers: { "x-csrf-token": csrf.token },
         credentials: "include",
       });
       if (!res.ok) throw new Error("Logout failed");

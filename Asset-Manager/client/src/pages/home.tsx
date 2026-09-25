@@ -66,7 +66,7 @@ export default function Home() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1570823336316-09a8f4c34898?q=80&w=2670&auto=format&fit=crop" 
+            src="/images/candle-6_1.jpg"
             alt="Luxury Candle" 
             className="w-full h-full object-cover"            loading="eager"
             decoding="async"
@@ -237,19 +237,19 @@ export default function Home() {
                 title: "Shop",
                 desc: "Browse our premium collection of handcrafted candles",
                 href: "/shop",
-                image: "https://images.unsplash.com/photo-1596516109370-29001ec8ec36?w=800&q=80",
+                image: "/images/candle-1_2.jpg",
               },
               {
                 title: "About",
                 desc: "Learn about our artisanal craftsmanship and story",
                 href: "/about",
-                image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=800&q=80",
+                image: "/images/candle-1_1.jpg",
               },
               {
                 title: "Contact",
                 desc: "Get in touch for custom orders and inquiries",
                 href: "/contact",
-                image: "https://images.unsplash.com/photo-1605651202774-7d573fd3f12d?w=800&q=80",
+                image: "/images/candle-6_2.jpg",
               },
             ].map((card, i) => (
               <motion.div
