@@ -45,6 +45,9 @@ export function OptimizedImage({
     width: optimizedWidth,
     height: optimizedHeight,
   });
+  const resolvedSrc = optimizedSrc.startsWith("/")
+    ? `${window.location.origin}${optimizedSrc}`
+    : optimizedSrc;
 
   // Generate srcSet for responsive Cloudinary images
   const srcSet = src.includes("res.cloudinary.com") && optimizedWidth
@@ -76,7 +79,7 @@ export function OptimizedImage({
       )}
 
       <img
-        src={optimizedSrc}
+        src={resolvedSrc}
         srcSet={srcSet}
         alt={alt}
         width={width}

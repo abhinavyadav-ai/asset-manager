@@ -1003,7 +1003,7 @@ export async function registerRoutes(
       marginPercent: 150,
       stock: 50,
       category: "Floral",
-      images: ["https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&q=80&w=1000"],
+      images: ["/images/candle-1_1.jpg"],
       isActive: true
     });
     await storage.createProduct({
@@ -1014,7 +1014,7 @@ export async function registerRoutes(
       marginPercent: 150,
       stock: 75,
       category: "Sweet",
-      images: ["https://images.unsplash.com/photo-1570823635306-250abb06d453?auto=format&fit=crop&q=80&w=1000"],
+      images: ["/images/candle-1_2.jpg"],
       isActive: true
     });
     await storage.createProduct({
@@ -1025,7 +1025,7 @@ export async function registerRoutes(
       marginPercent: 143,
       stock: 60,
       category: "Fresh",
-      images: ["https://images.unsplash.com/photo-1602825389660-3f58693cc541?auto=format&fit=crop&q=80&w=1000"],
+      images: ["/images/candle-1_3.jpg"],
       isActive: true
     });
     await storage.createProduct({
@@ -1036,7 +1036,7 @@ export async function registerRoutes(
       marginPercent: 150,
       stock: 40,
       category: "Floral",
-      images: ["https://images.unsplash.com/photo-1602874801007-bd458bb1b8b6?auto=format&fit=crop&q=80&w=1000"],
+      images: ["/images/candle-1_4.jpg"],
       isActive: true
     });
     await storage.createProduct({
@@ -1047,7 +1047,7 @@ export async function registerRoutes(
       marginPercent: 154,
       stock: 45,
       category: "Woody",
-      images: ["https://images.unsplash.com/photo-1608181831718-c9ffd8685a63?auto=format&fit=crop&q=80&w=1000"],
+      images: ["/images/candle-1_5.jpg"],
       isActive: true
     });
     await storage.createProduct({
@@ -1058,7 +1058,7 @@ export async function registerRoutes(
       marginPercent: 145,
       stock: 55,
       category: "Floral",
-      images: ["https://images.unsplash.com/photo-1599751449619-ad8a1050e67e?auto=format&fit=crop&q=80&w=1000"],
+      images: ["/images/candle-6_1.jpg"],
       isActive: true
     });
   }
